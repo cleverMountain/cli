@@ -1,3 +1,5 @@
+
+
 class Event {
   constructor() {
     this.cbs = new Map()
@@ -44,3 +46,5 @@ class Event {
     }
   }
 }
+
+module.exports = Event
