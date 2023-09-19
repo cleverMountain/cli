@@ -50,3 +50,198 @@ class Event {
 }
 
 ```
+
+
+## prompts源码解析
+
+### isNodeLT
+```js
+// 版本判断
+function isNodeLT(tar) {
+  tar = (Array.isArray(tar) ? tar : tar.split('.')).map(Number);
+  let i=0, src=process.versions.node.split('.').map(Number);
+  for (; i < tar.length; i++) {
+    if (src[i] > tar[i]) return false;
+    if (tar[i] > src[i]) return true;
+  }
+  return false;
+}
+module.exports =
+  isNodeLT('8.6.0')
+    ? require('./dist/index.js')
+    : require('./lib/index.js');
+```
+
+### prompt
+```js
+async function prompt(questions=[]) {
+  const answers = {};
+  const override = prompt._override || {};
+  // 合并问题为数组
+  questions = [].concat(questions);
+  let answer, question, quit, name, type, lastPrompt;
+
+  const getFormattedAnswer = async (question, answer, skipValidation = false) => {
+    if (!skipValidation && question.validate && question.validate(answer) !== true) {
+      return;
+    }
+    return question.format ? await question.format(answer, answers) : answer
+  };
+
+  // 条件判断过程省略
+  // 获取输入问题的答案prompts，并返回answer
+  answer = prompt._injected ? getInjectedAnswer(prompt._injected, question.initial) : await prompts[type](question);
+  answers[name] = answer = await getFormattedAnswer(question, answer, true);
+  return answers;
+}
+```
+
+### prompts
+```js
+// prompts是一个对象根据输入的类型确定
+const $ = exports = prompts = {
+  text: args => toPrompt('TextPrompt', args),
+  password: args => {
+    args.style = 'password';
+    return $.text(args);
+  },
+  number: args => toPrompt('NumberPrompt', args),
+  ....
+};
+/**
+ * 根据所传为text 
+ *  {
+      type: 'text',
+      name: 'name',
+      message: '请输入您的名字:'
+    }
+*/
+const prompts = function toPrompt(type, args, opts={}) {
+  return new Promise((res, rej) => {
+    const p = new el[type](args);
+    const onAbort = opts.onAbort || noop;
+    const onSubmit = opts.onSubmit || noop;
+    const onExit = opts.onExit || noop;
+    // 注册事件
+    p.on('state', args.onState || noop);
+    p.on('submit', x => res(onSubmit(x)));
+    p.on('exit', x => res(onExit(x)));
+    p.on('abort', x => rej(onAbort(x)));
+  });
+}
+
+// el 为一个对象，根据传入的type决定解析使用的模块
+const el  = {
+  TextPrompt: require('./text'),
+  SelectPrompt: require('./select'),
+  TogglePrompt: require('./toggle'),
+  DatePrompt: require('./date'),
+  NumberPrompt: require('./number'),
+  MultiselectPrompt: require('./multiselect'),
+  AutocompletePrompt: require('./autocomplete'),
+  AutocompleteMultiselectPrompt: require('./autocompleteMultiselect'),
+  ConfirmPrompt: require('./confirm')
+}
+```
+
+### TextPrompt解析text
+
+```js
+action = (key, isSelect) => {
+  if (key.meta && key.name !== 'escape') return;
+  
+  if (key.ctrl) {
+    if (key.name === 'a') return 'first';
+    if (key.name === 'c') return 'abort';
+    if (key.name === 'd') return 'abort';
+    if (key.name === 'e') return 'last';
+    if (key.name === 'g') return 'reset';
+  }
+  
+  if (isSelect) {
+    if (key.name === 'j') return 'down';
+    if (key.name === 'k') return 'up';
+  }
+
+  if (key.name === 'return') return 'submit';
+  if (key.name === 'enter') return 'submit'; // ctrl + J
+  if (key.name === 'backspace') return 'delete';
+  if (key.name === 'delete') return 'deleteForward';
+  if (key.name === 'abort') return 'abort';
+  if (key.name === 'escape') return 'exit';
+  if (key.name === 'tab') return 'next';
+  if (key.name === 'pagedown') return 'nextPage';
+  if (key.name === 'pageup') return 'prevPage';
+  // TODO create home() in prompt types (e.g. TextPrompt)
+  if (key.name === 'home') return 'home';
+  // TODO create end() in prompt types (e.g. TextPrompt)
+  if (key.name === 'end') return 'end';
+
+  if (key.name === 'up') return 'up';
+  if (key.name === 'down') return 'down';
+  if (key.name === 'right') return 'right';
+  if (key.name === 'left') return 'left';
+
+  return false;
+};
+
+```
+```js
+
+// 继承
+class TextPrompt extends Prompt {
+  super(opts);
+  // 开始执行
+  this.render();
+  this.value = ``
+  render() {
+    this.out.write(...)
+  }
+  // 结束
+  abort() {
+    this.fire();
+    this.render();
+    this.out.write('\n');
+    this.close();
+  }
+}
+// 继承事件函数event
+class Prompt extends EventEmitter {
+    super();
+    // 输入输出
+    this.in = process.stdin;
+    this.out = process.stdout;
+    const rl = readline.createInterface({ input:this.in, escapeCodeTimeout:50 });
+    readline.emitKeypressEvents(this.in, rl);
+    // 键盘事件
+    const keypress = (str, key) => {
+      // 根据action表判断输出
+      let a = action(key, isSelect);
+      if (a === false) {
+        this._ && this._(str, key);
+      } else if (typeof this[a] === 'function') {
+        // 移动光标
+        this[a](key);
+      } else {
+        // 输出
+        this.bell();
+      }
+    };
+
+    this.close = () => {
+      this.out.write(cursor.show);
+      this.in.removeListener('keypress', keypress);
+      if (this.in.isTTY) this.in.setRawMode(false);
+      rl.close();
+      this.emit(this.aborted ? 'abort' : this.exited ? 'exit' : 'submit', this.value);
+      this.closed = true;
+    };
+    // 监听键盘事件
+    this.in.on('keypress', keypress);
+    // 输入
+    bell() {
+      this.out.write(beep);
+    }
+
+}
+```
