@@ -7,7 +7,7 @@ const questions = [
     message: '请输入您的名字:'
   },
   {
-    type: 'number',
+    type: 'text',
     name: 'age',
     message: '请输入您的年龄:'
   }
@@ -16,6 +16,7 @@ const questions = [
 (async () => {
   const response = await prompts(questions);
 
-  console.log(`您的名字是：${response.name}`);
-  console.log(`您的年龄是：${response.age}`);
+  // console.log(`您的名字是：${response.name}`);
+  // console.log(`您的年龄是：${response.age}`);
+  console.log(response)
 })();

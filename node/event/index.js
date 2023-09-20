@@ -47,4 +47,7 @@ class Event {
   }
 }
 
-module.exports = Event
+// module.exports = Event
+// let ev = new Event()
+// ev.on('state', (a) => {console.log(a)})
+// ev.emit('state', {a: 1, b:2})

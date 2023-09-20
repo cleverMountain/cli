@@ -3,7 +3,7 @@
 const readline = require('readline');
 const action  = require('./action');
 const EventEmitter = require('events');
-// const { beep, cursor } = require('sisteransi');
+const { beep, cursor } = require('sisteransi');
 
 /**
  * Base prompt skeleton
@@ -26,41 +26,27 @@ class Prompt extends EventEmitter {
     const keypress = (str, key) => {
       let a = action(key, isSelect);
       if (a === false) {
-        this._ && this._(str, key);
+        this.write(str, key)
       } else if (typeof this[a] === 'function') {
         this[a](key);
-      } else {
-        this.bell();
       }
     };
 
     this.close = () => {
-      this.out.write('eqw');
       this.in.removeListener('keypress', keypress);
       if (this.in.isTTY) this.in.setRawMode(false);
       rl.close();
-      this.emit(this.aborted ? 'abort' : this.exited ? 'exit' : 'submit', this.value);
+      if (!this.aborted) {
+        this.emit('submit', this._value)
+      }
+      // this.emit(this.aborted ? 'abort' : this.exited ? 'exit' : 'submit', this._value);
       this.closed = true;
     };
-
     this.in.on('keypress', keypress);
   }
-
-  fire() {
-    this.emit('state', {
-      value: this.value,
-      aborted: !!this.aborted,
-      exited: !!this.exited
-    });
-  }
-
-  bell() {
-    this.out.write(beep);
-  }
-
-  render() {
-    this.onRender(color);
-    if (this.firstRender) this.firstRender = false;
+  write(str, key) {
+    this.value = str
+    this.out.write(str)
   }
 }
 
