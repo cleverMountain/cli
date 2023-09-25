@@ -1,3 +1,60 @@
+# create vieite
+## 进入主函数Init前
+```JS
+// 获取传入参数
+const argv = minimist(process.argv.slice(2), { string: ['_'] })
+// 获取当前工作目录
+const cwd = process.cwd()
+// 创建项目的选项及颜色配置
+const FRAMEWORKS = []
+```
+
+## init主函数
+```js
+// 获取默认项目模板
+let targetDir = formatTargetDir(argv._[0])
+let template = argv.template || argv.t
+const defaultTargetDir = 'vite-project'
+const getProjectName = () =>
+  targetDir === '.' ? path.basename(path.resolve()) : targetDir
+// 通过propmpts获取项目信息
+const { framework, overwrite, packageName, variant } = await prompts
+// 获取模板中的文件名(包括文件及文件名)
+template = variant || framework || template
+const templateDir = path.resolve(
+    fileURLToPath(import.meta.url),
+    '..',
+    `template-${template}`
+  )
+const files = fs.readdirSync(templateDir)
+// 写入文件或文件夹
+for (const file of files.filter((f) => f !== 'package.json')) {
+  write(file)
+}
+// 先读取模板的package.json在给项目写入，主要是为了修改名字
+const pkg = JSON.parse(
+  fs.readFileSync(path.join(templateDir, `package.json`), 'utf-8')
+)
+pkg.name = packageName || getProjectName()
+write('package.json', JSON.stringify(pkg, null, 2))
+// 添加开启项目的说明 进入项目 安装依赖 启动项目
+const pkgInfo = pkgFromUserAgent(process.env.npm_config_user_agent)
+const pkgManager = pkgInfo ? pkgInfo.name : 'npm'
+console.log(`\nDone. Now run:\n`)
+if (root !== cwd) {
+  console.log(`  cd ${path.relative(cwd, root)}`)
+}
+switch (pkgManager) {
+  case 'yarn':
+    console.log('  yarn')
+    console.log('  yarn dev')
+    break
+  default:
+    console.log(`  ${pkgManager} install`)
+    console.log(`  ${pkgManager} run dev`)
+    break
+}
+```
 ##  event对象
 
 ```js
